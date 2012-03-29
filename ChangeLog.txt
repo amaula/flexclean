@@ -1,0 +1,13 @@
+******************************************************************************
+** flexclean                                                                **
+******************************************************************************
+
+*****************
+
+* 1.2 @ 29.03.2012
+  - Some output format cleanups.
+  - Works on defaults if python-argparse lib is not installed
+
+
+* 1.0 @ 29.03.2012
+  - First release, cleans obsolete files from a flexbackup file archive.

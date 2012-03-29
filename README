@@ -1,0 +1,12 @@
+* flexclean - v1.0
+Copyright (C) 2012 - Antti Maula
+
+Simple python script to clean up outdated 'timestamped' files created by the
+flexbackup software. Without any parameters, the script will search thecurrent
+working directory for all files with postfix'*.tar'. The files found are then
+matched against a regular expression, which will split the filenames in three
+parts: prefix, level and timestamp. The filenames are then grouped by prefix,
+then by level and finally ordered by timestamp inside each group. After all
+this, the selected number of 'oldest' files per level are selected for
+deletion. Before deleting anything, the script requires the user to write a
+word 'confirm', after which it will delete all files listed to be deleted.

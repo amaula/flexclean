@@ -18,41 +18,62 @@ See <http://www.gnu.org/licenses/>.
 """
 
 
-
-import argparse
 import os
 import re
 import sys
 from glob import glob
 
 def handle_arguments():
+    defaults = { 'p':'.',
+                 'm':'*.tar',
+                 'd':1,
+                 'r':'(.*)\.([0123456789])\.([0123456789]{12})\..*' }
+
+    try:
+        import argparse
+    except ImportError:
+        print "No argparse module available. Using defaults only."
+        return defaults
+        
+
     """Handle command line parameters.
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-p', action='store', metavar='path', default='.', type=str,
-                        help='Path to clean up (default: current directory)')
-    parser.add_argument('-m', action='store', metavar='wildcard', default='*.tar', type=str,
-                        help='Wildcard of files to match - only these will be checked (default: *.tar)')
-    parser.add_argument('-d', action='store', metavar='depth', default=1, type=int,
-                        help='Number of files per level to keep (default: 1)')
-    #parser.add_argument('-i', action='store', metavar='num', default=5, type=int,
-    #                    help='History length to consider when checking mean/std values (default: 5)')
+    description="Simple python script to clean up outdated 'timestamped' files created by the flexbackup software. "\
+                "Without any parameters, the script will search the" \
+                "current working directory for all files with postfix" \
+                "'*.tar'. The files found are then matched against a regular expression, which will split "\
+                "the filenames in three parts: prefix, level and timestamp. The filenames are then "\
+                "grouped by prefix, then by level and finally ordered by timestamp inside each group. "\
+                "After all this, the selected number of 'oldest' files per level are selected for deletion. "\
+                "Before deleting anything, the script requires the user to write a word 'confirm', after which "\
+                "it will delete all files listed to be deleted."
     
-    return parser.parse_args()
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('-p', action='store', metavar='path', default=defaults['p'], type=str,
+                        help='Path to clean up (default: current directory)')
+    parser.add_argument('-m', action='store', metavar='wildcard', default=defaults['m'], type=str,
+                        help='Wildcard of files to match - only these will be checked (default: *.tar)')
+    parser.add_argument('-d', action='store', metavar='depth', default=defaults['d'], type=int,
+                        help='Number of files per level to keep (default: 1)')
+    parser.add_argument('-r', action='store', metavar='regexp', default=defaults['r'],
+                        type=str,
+                        help='Regular expression to match the filenames against '\
+                        '(default: (.*)\.([0123456789])\.([0123456789]{12})\..*). Please note that the regexp must '\
+                        'return three values: <prefix>,<level>,<timestamp> to be compatible with this script')
+    
+    # Reading through the dict, just to be able to do the default() thingy
+    return parser.parse_args().__dict__
 
 
 def main():
-    # Parameters
-    path = './files'
-    match = '*.tar'
-    extract = '(.*)\.([0123456789])\.([0123456789]{12})\..*'
-    keep_depth = 1
-    
     # Arguments
     arguments = handle_arguments()
-    path = arguments.p
-    match = arguments.m
-    keep_depth = arguments.d
+    path = arguments['p']
+    match = arguments['m']
+    extract = arguments['r']
+    keep_depth = arguments['d']
+
+    print "FlexClean v1.2 - A Really simple tool to clean up obsolete files from a flexbackup timestamped archive"
 
     # Stupid user check
     assert keep_depth > 0
@@ -62,16 +83,29 @@ def main():
     if len(files) == 0:
         print "No matching (%s) files found from given path (%s) - will do nothing" % \
               (match, path)
+        print "Try parameter -h for help and options"
         sys.exit(1)
 
 
     # split and organize
     filesbyprefix = {}
-    extract_re=re.compile(extract)
+
+    try:
+        extract_re=re.compile(extract)
+    except re.error:
+        print "Failed to compile the given regular expression. Please check your regexp or use the default."
+        sys.exit(1)
+
     for infile in files:
         match = extract_re.match(infile)
         if match:
-            prefix,level,timestamp = match.groups()
+            try:
+                prefix,level,timestamp = match.groups()
+            except ValueError:
+                print "Failed to get required three fields from the regexp!"
+                print "The regular expression must match three groups in order:"
+                print "<prefix>,<level>,<timestamp>"
+                sys.exit(1)
 
             filesbylevel = filesbyprefix.get(prefix, {}) 
             files = filesbylevel.get(str(level), [])
@@ -99,7 +133,7 @@ def main():
 
     # Now print
     if len(kept_files) > 0:
-        print "Keeping files:"
+        print "**** Keeping files: ****"
         for f in kept_files:
             print f[1]
     else:
@@ -107,11 +141,11 @@ def main():
         sys.exit(1)
 
     if len(deleted_files) > 0:
-        print "About to delete files:"
+        print "\n**** About to delete files: ****"
         for f in deleted_files:
             print f[1]
 
-        inp=raw_input("Type in 'confirm' to delete these files: ")
+        inp=raw_input("Type in 'confirm' to delete these files, or anything else to abort: ")
         if inp == 'confirm':
             for f in deleted_files:
                 os.remove(f[1])
